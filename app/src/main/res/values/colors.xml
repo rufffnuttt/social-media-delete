@@ -6,4 +6,8 @@
     <color name="accent">#5B3DF5</color>
     <color name="ok">#1E9E5A</color>
     <color name="warn">#D9480F</color>
+    <color name="interrupt_bg">#16132B</color>
+    <color name="interrupt_text">#F4F2FF</color>
+    <color name="interrupt_muted">#B9B4D6</color>
+    <color name="button_ghost">#2C2750</color>
 </resources>

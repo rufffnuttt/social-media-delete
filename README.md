@@ -13,6 +13,23 @@ An Android app that removes the endless short-video feeds from social media
 
 Each one can be switched on/off in the app. It also counts how many times it saved you from a feed.
 
+### Adult website blocking
+- Reads the address bar in Chrome, Samsung Internet, Firefox, Edge, Brave, Opera,
+  Vivaldi, DuckDuckGo and others, and closes known adult sites and explicit searches.
+- One-tap setup for a **phone-wide** filter: Android's *Private DNS* set to
+  CleanBrowsing's free adult filter (`adult-filter-dns.cleanbrowsing.org`),
+  which also covers other apps and forces Google/Bing SafeSearch.
+
+### Screen time & reminders
+- Counts your time in social apps (Instagram, YouTube, TikTok, Facebook, Snapchat,
+  X, Reddit, Threads, Pinterest, Tumblr, Twitch) and shows today's total, a per-app
+  breakdown, number of opens and your 7-day average.
+- **Daily limit** (default 1h): when you hit it, opening a social app shows a stop
+  screen – *Close* or *5 more minutes* (that button unlocks after 10 seconds).
+- **Break reminder** (default every 15 min of non-stop scrolling).
+- **Take-a-breath pause**: a 5-second pause screen each time you open a social app,
+  telling you how many times you've opened it today.
+
 ## How it works
 
 NoScroll uses Android's Accessibility feature (the same thing apps like
@@ -20,8 +37,8 @@ ScrollGuard use). When it sees a Reels/Shorts player or tab on screen it
 presses **Back** for you, so you land back on the normal feed. If Back
 doesn't get you out after a couple of tries, it goes to the home screen.
 
-It has **no internet permission** and stores nothing except your switches and
-the block counter.
+It has **no internet permission**. Everything (settings, counters, screen time)
+stays on your phone.
 
 ## Install on your phone
 
@@ -35,11 +52,14 @@ the block counter.
       **Allow restricted settings**. (Android requires this for accessibility apps
       not installed from the Play Store. If you don't see the option, skip it.)
    2. *Open Accessibility settings* → **Installed / Downloaded apps** → **NoScroll** → on → Allow.
-4. The status turns green: **Blocking is ON**. Try opening Reels – it should bounce you right back.
+4. The status turns green: **NoScroll is ON**. Try opening Reels – it should bounce you right back.
 
 Samsung / Xiaomi / some other phones may stop background services to save
 battery. If blocking stops after a while, set NoScroll's battery usage to
 **Unrestricted** in App info → Battery.
+
+5. Optional but recommended: tap **Copy address & open settings** under
+   *Adult content* and paste it into **Private DNS → Private DNS provider hostname**.
 
 ## If something slips through
 

@@ -27,6 +27,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".InterruptActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.noscroll.app.interrupt"
+            android:theme="@style/InterruptTheme" />
+
         <service
             android:name=".BlockerService"
             android:exported="false"

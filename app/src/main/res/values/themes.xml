@@ -6,4 +6,12 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowBackground">@color/bg</item>
     </style>
+
+    <style name="InterruptTheme" parent="AppTheme">
+        <item name="android:windowBackground">@color/interrupt_bg</item>
+        <item name="android:statusBarColor">@color/interrupt_bg</item>
+        <item name="android:navigationBarColor">@color/interrupt_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+    </style>
 </resources>
