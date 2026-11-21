@@ -47,7 +47,7 @@ object Browsers {
  * unlikely to appear in ordinary URLs or searches.
  */
 object AdultFilter {
-    private val domains = listOf(
+    val domainList = listOf(
         "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "redtube.com", "youporn.com",
         "tube8.com", "spankbang.com", "eporner.com", "tnaflix.com", "motherless.com", "erome.com",
         "hqporner.com", "porntrex.com", "thumbzilla.com", "beeg.com", "txxx.com", "hclips.com",
@@ -77,7 +77,7 @@ object AdultFilter {
         val host = text
             .removePrefix("https://").removePrefix("http://").removePrefix("www.")
             .substringBefore('/').substringBefore('?').substringBefore(' ')
-        if (domains.any { host == it || host.endsWith(".$it") }) return true
+        if (domainList.any { host == it || host.endsWith(".$it") }) return true
 
         // Turn "google.com/search?q=sex+video" and "sex-video" into "sex video".
         val words = text.replace("%20", " ").replace(Regex("[+_\\-./?=&#:]+"), " ")
@@ -112,4 +112,33 @@ object TrackedApps {
 
     fun isTracked(pkg: String?) = pkg != null && names.containsKey(pkg)
     fun name(pkg: String) = names[pkg] ?: pkg
+}
+
+/** Websites of the social apps, so sleep mode can block them in browsers too. */
+object SocialSites {
+    private val domains = mapOf(
+        "instagram.com" to "Instagram",
+        "youtube.com" to "YouTube",
+        "youtu.be" to "YouTube",
+        "tiktok.com" to "TikTok",
+        "facebook.com" to "Facebook",
+        "fb.com" to "Facebook",
+        "snapchat.com" to "Snapchat",
+        "x.com" to "X",
+        "twitter.com" to "X",
+        "reddit.com" to "Reddit",
+        "threads.net" to "Threads",
+        "threads.com" to "Threads",
+        "pinterest.com" to "Pinterest",
+        "tumblr.com" to "Tumblr",
+        "twitch.tv" to "Twitch",
+    )
+
+    /** Returns the app name for a social website URL, or null. */
+    fun appFor(rawUrl: String): String? {
+        val host = rawUrl.lowercase().trim()
+            .removePrefix("https://").removePrefix("http://")
+            .substringBefore('/').substringBefore('?').substringBefore(' ')
+        return domains.entries.firstOrNull { (d, _) -> host == d || host.endsWith(".$d") }?.value
+    }
 }

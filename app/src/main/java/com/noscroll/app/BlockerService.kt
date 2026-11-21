@@ -18,7 +18,9 @@ import android.widget.Toast
  *  - backs out of Reels / Shorts / Spotlight feeds and closes TikTok,
  *  - closes adult websites in supported browsers,
  *  - tracks time in social apps and shows break reminders, a daily limit,
- *    and an optional "take a breath" pause when a social app is opened.
+ *    and an optional "take a breath" pause when a social app is opened,
+ *  - enforces sleep mode (no social apps / sites during the schedule), and in
+ *    strict mode stops NoScroll itself from being switched off during it.
  */
 class BlockerService : AccessibilityService() {
 
@@ -82,6 +84,11 @@ class BlockerService : AccessibilityService() {
             setForeground(pkg)
         }
 
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && Sleep.blocksApp(prefs, pkg)) {
+            enforceSleep(pkg)
+            return
+        }
+
         val rule = Rules.forPackage(pkg)
         val enabledRule = rule != null && prefs.isEnabled(rule)
         if (enabledRule && rule!!.blockWholeApp &&
@@ -91,8 +98,10 @@ class BlockerService : AccessibilityService() {
             return
         }
 
-        val watchBrowser = prefs.blockAdult && Browsers.isBrowser(pkg)
-        if ((enabledRule || watchBrowser) && !checkPending) {
+        val watchBrowser = Browsers.isBrowser(pkg) &&
+            (prefs.blockAdult || (prefs.sleepBlockBrowsers && Sleep.isActive(prefs)))
+        val watchSettings = pkg in PROTECTED_PKGS && Sleep.isLocked(prefs)
+        if ((enabledRule || watchBrowser || watchSettings) && !checkPending) {
             // Coalesce the flood of content-changed events into one check every ~100ms.
             checkPending = true
             handler.postDelayed(checkRunnable, CHECK_DELAY_MS)
@@ -111,9 +120,26 @@ class BlockerService : AccessibilityService() {
         } ?: return
         val pkg = root.packageName?.toString()
 
-        if (prefs.blockAdult && Browsers.isBrowser(pkg)) {
-            val url = try { Browsers.readUrl(root) } catch (e: Exception) { null }
-            if (url != null && AdultFilter.isAdult(url)) blockAdult()
+        if (pkg in PROTECTED_PKGS) {
+            // Strict sleep mode: don't allow NoScroll to be turned off or uninstalled.
+            if (Sleep.isLocked(prefs) && root.findAccessibilityNodeInfosByText("NoScroll").isNotEmpty()) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                Toast.makeText(this, "NoScroll is locked during sleep mode", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+
+        if (Browsers.isBrowser(pkg)) {
+            val url = try { Browsers.readUrl(root) } catch (e: Exception) { null } ?: return
+            if (prefs.blockAdult && AdultFilter.isAdult(url)) {
+                blockAdult()
+            } else if (prefs.sleepBlockBrowsers && Sleep.isActive(prefs)) {
+                val app = SocialSites.appFor(url)
+                if (app != null && app in prefs.sleepApps) {
+                    performGlobalAction(GLOBAL_ACTION_BACK)
+                    showInterrupt(InterruptActivity.MODE_SLEEP, null, force = true)
+                }
+            }
             return
         }
 
@@ -198,7 +224,17 @@ class BlockerService : AccessibilityService() {
         fgSince = now
     }
 
+    /** Sleep mode: send the user home and show the sleep screen. */
+    private fun enforceSleep(pkg: String) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastActionAt < COOLDOWN_MS) return
+        lastActionAt = now
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        showInterrupt(InterruptActivity.MODE_SLEEP, pkg, force = true)
+    }
+
     private fun onEnterSocialApp(pkg: String, prev: String?) {
+        if (Sleep.blocksApp(prefs, pkg)) return
         val now = SystemClock.elapsedRealtime()
         if (now - lastSocialAt > SESSION_GAP_MS) {
             sessionStart = now
@@ -238,6 +274,11 @@ class BlockerService : AccessibilityService() {
         val pkg = fgPkg ?: return
         if (!TrackedApps.isTracked(pkg)) return
         commitUsage()
+        if (Sleep.blocksApp(prefs, pkg)) {
+            // Sleep time started while the app was open.
+            enforceSleep(pkg)
+            return
+        }
 
         val now = SystemClock.elapsedRealtime()
         val breakMs = prefs.breakReminderMin * 60_000L
@@ -300,5 +341,14 @@ class BlockerService : AccessibilityService() {
         private const val SESSION_GAP_MS = 3 * 60_000L
         private const val REOPEN_GAP_MS = 60_000L
         private const val INTERRUPT_GAP_MS = 8_000L
+
+        /** Screens where NoScroll could be disabled or uninstalled. */
+        private val PROTECTED_PKGS = setOf(
+            "com.android.settings",
+            "com.google.android.packageinstaller",
+            "com.android.packageinstaller",
+            "com.samsung.android.packageinstaller",
+            "com.miui.securitycenter",
+        )
     }
 }

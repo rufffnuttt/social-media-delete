@@ -8,7 +8,7 @@ An Android app that removes the endless short-video feeds from social media
 | Instagram  | Reels (tab, and reels opened from DMs/feed) | Home feed, Stories, DMs, profiles, search |
 | YouTube    | Shorts (tab and player)     | Regular videos, search, subscriptions         |
 | Facebook   | Reels tab (best effort)     | Everything else                               |
-| Snapchat   | Spotlight tab               | Chats, camera, Stories                        |
+| Snapchat   | Spotlight ("Snap reels"): the tab, and Spotlight videos opened from Stories or chats | Chats, camera, friends' Stories |
 | TikTok     | The whole app (it's only a feed) | –                                        |
 
 Each one can be switched on/off in the app. It also counts how many times it saved you from a feed.
@@ -20,6 +20,24 @@ Each one can be switched on/off in the app. It also counts how many times it sav
   CleanBrowsing's free adult filter (`adult-filter-dns.cleanbrowsing.org`),
   which also covers other apps and forces Google/Bing SafeSearch.
 
+### Sleep mode
+Blocks social media completely during your sleep hours. Everything is configurable:
+- start and end time, and which nights (e.g. only school nights)
+- which apps are blocked (default: all of them)
+- also block their websites in browsers (default on)
+- emergency 5-minute unlock after a 30-second wait (default off)
+- **strict lock**: during sleep, NoScroll's settings are locked and the Android screens
+  for turning it off or uninstalling it are blocked (default off)
+
+### Ad blocker
+A local, on-phone VPN that only handles DNS lookups (like Blokada / DNS66). It blocks
+~100k ad, tracker and malware domains (StevenBlack hosts list, bundled at build time)
+in every app and browser. It can also filter adult sites phone-wide by using
+CleanBrowsing's adult-filter DNS, which also forces SafeSearch.
+Ads served from the same servers as the content (YouTube and Instagram in-app ads)
+can't be removed this way. Turn on **Always-on VPN** for NoScroll in Android's VPN
+settings to keep it running after restarts.
+
 ### Screen time & reminders
 - Counts your time in social apps (Instagram, YouTube, TikTok, Facebook, Snapchat,
   X, Reddit, Threads, Pinterest, Tumblr, Twitch) and shows today's total, a per-app
@@ -27,7 +45,7 @@ Each one can be switched on/off in the app. It also counts how many times it sav
 - **Daily limit** (default 1h): when you hit it, opening a social app shows a stop
   screen – *Close* or *5 more minutes* (that button unlocks after 10 seconds).
 - **Break reminder** (default every 15 min of non-stop scrolling).
-- **Take-a-breath pause**: a 5-second pause screen each time you open a social app,
+- **Take-a-breath pause**: a pause screen (3–30 seconds, configurable) each time you open a social app,
   telling you how many times you've opened it today.
 
 ## How it works
@@ -37,8 +55,8 @@ ScrollGuard use). When it sees a Reels/Shorts player or tab on screen it
 presses **Back** for you, so you land back on the normal feed. If Back
 doesn't get you out after a couple of tries, it goes to the home screen.
 
-It has **no internet permission**. Everything (settings, counters, screen time)
-stays on your phone.
+Everything (settings, counters, screen time) stays on your phone. The only network
+use is the ad blocker forwarding normal DNS lookups to a DNS server.
 
 ## Install on your phone
 
@@ -58,8 +76,10 @@ Samsung / Xiaomi / some other phones may stop background services to save
 battery. If blocking stops after a while, set NoScroll's battery usage to
 **Unrestricted** in App info → Battery.
 
-5. Optional but recommended: tap **Copy address & open settings** under
-   *Adult content* and paste it into **Private DNS → Private DNS provider hostname**.
+5. Optional: turn on **Block ads & trackers** and allow the VPN request. It also
+   filters adult sites in all apps. If you'd rather not use the ad blocker, use
+   **Copy address & open settings** under *Adult content* and paste it into
+   **Private DNS → Private DNS provider hostname** instead (don't use both).
 
 ## If something slips through
 

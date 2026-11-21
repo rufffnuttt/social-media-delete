@@ -15,6 +15,7 @@ import android.widget.TextView
  *  - BREAK: "you've been scrolling for X minutes"
  *  - LIMIT: daily limit reached
  *  - ADULT: an adult website was blocked
+ *  - SLEEP: sleep mode is on
  */
 class InterruptActivity : Activity() {
 
@@ -48,7 +49,7 @@ class InterruptActivity : Activity() {
                 primary.text = "Never mind"
                 primary.setOnClickListener { leave() }
                 secondary.setOnClickListener { pkg?.let { grantPass(it) }; finish() }
-                delayButton(secondary, "Open $appName", 5)
+                delayButton(secondary, "Open $appName", prefs.pauseSeconds)
             }
             MODE_BREAK -> {
                 val sessionMs = intent.getLongExtra(EXTRA_SESSION_MS, 0L)
@@ -73,12 +74,30 @@ class InterruptActivity : Activity() {
                     "\n\nThat's enough for today — the rest of your phone still works."
                 primary.text = "Close $appName"
                 primary.setOnClickListener { leave() }
+                if (!prefs.allowLimitSnooze) secondary.visibility = View.GONE
                 secondary.setOnClickListener {
                     prefs.limitSnoozeUntil = System.currentTimeMillis() + 5 * 60_000L
                     BlockerService.instance?.onKeepGoing()
                     finish()
                 }
                 delayButton(secondary, "5 more minutes", 10)
+            }
+            MODE_SLEEP -> {
+                emoji.text = "🌙"
+                title.text = "Sleep mode"
+                message.text = "Social media is off until ${Sleep.formatTime(prefs.sleepEnd)}." +
+                    "\n\nPut the phone down — tomorrow-you will thank you."
+                primary.text = "Good night"
+                primary.setOnClickListener { leave() }
+                if (prefs.sleepAllowUnlock) {
+                    secondary.setOnClickListener {
+                        prefs.sleepUnlockUntil = System.currentTimeMillis() + 5 * 60_000L
+                        finish()
+                    }
+                    delayButton(secondary, "Emergency: unlock 5 minutes", 30)
+                } else {
+                    secondary.visibility = View.GONE
+                }
             }
             MODE_ADULT -> {
                 emoji.text = "🚫"
@@ -148,6 +167,7 @@ class InterruptActivity : Activity() {
         const val MODE_BREAK = "break"
         const val MODE_LIMIT = "limit"
         const val MODE_ADULT = "adult"
+        const val MODE_SLEEP = "sleep"
 
         private val passes = HashMap<String, Long>()
         private const val PASS_MS = 60_000L

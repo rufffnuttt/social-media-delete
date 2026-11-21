@@ -57,6 +57,69 @@ class Prefs(context: Context) {
         get() = sp.getLong("limit_snooze", 0L)
         set(v) = sp.edit().putLong("limit_snooze", v).apply()
 
+    /** Seconds the take-a-breath pause lasts before the app can be opened. */
+    var pauseSeconds: Int
+        get() = sp.getInt("pause_seconds", 5)
+        set(v) = sp.edit().putInt("pause_seconds", v).apply()
+
+    /** Whether the daily-limit screen offers "5 more minutes". */
+    var allowLimitSnooze: Boolean
+        get() = sp.getBoolean("allow_limit_snooze", true)
+        set(v) = sp.edit().putBoolean("allow_limit_snooze", v).apply()
+
+    // ---- Sleep mode ----------------------------------------------------------
+
+    var sleepEnabled: Boolean
+        get() = sp.getBoolean("sleep_enabled", false)
+        set(v) = sp.edit().putBoolean("sleep_enabled", v).apply()
+
+    /** Minutes after midnight. */
+    var sleepStart: Int
+        get() = sp.getInt("sleep_start", 22 * 60)
+        set(v) = sp.edit().putInt("sleep_start", v).apply()
+
+    var sleepEnd: Int
+        get() = sp.getInt("sleep_end", 7 * 60)
+        set(v) = sp.edit().putInt("sleep_end", v).apply()
+
+    /** Nights sleep mode starts on, as a bitmask: bit 0 = Monday … bit 6 = Sunday. */
+    var sleepDays: Int
+        get() = sp.getInt("sleep_days", 0b1111111)
+        set(v) = sp.edit().putInt("sleep_days", v).apply()
+
+    /** App names (from [TrackedApps]) blocked during sleep. */
+    var sleepApps: Set<String>
+        get() = sp.getStringSet("sleep_apps", null) ?: TrackedApps.names.values.toSet()
+        set(v) = sp.edit().putStringSet("sleep_apps", v).apply()
+
+    var sleepBlockBrowsers: Boolean
+        get() = sp.getBoolean("sleep_browsers", true)
+        set(v) = sp.edit().putBoolean("sleep_browsers", v).apply()
+
+    var sleepAllowUnlock: Boolean
+        get() = sp.getBoolean("sleep_allow_unlock", false)
+        set(v) = sp.edit().putBoolean("sleep_allow_unlock", v).apply()
+
+    var sleepUnlockUntil: Long
+        get() = sp.getLong("sleep_unlock_until", 0L)
+        set(v) = sp.edit().putLong("sleep_unlock_until", v).apply()
+
+    /** Stops NoScroll from being turned off or changed while sleep mode is active. */
+    var sleepStrict: Boolean
+        get() = sp.getBoolean("sleep_strict", false)
+        set(v) = sp.edit().putBoolean("sleep_strict", v).apply()
+
+    // ---- Ad blocker ----------------------------------------------------------
+
+    var adBlockEnabled: Boolean
+        get() = sp.getBoolean("adblock", false)
+        set(v) = sp.edit().putBoolean("adblock", v).apply()
+
+    /** Upstream DNS used by the ad blocker: "adult" (CleanBrowsing adult filter) or "plain". */
+    var adBlockUpstream: String
+        get() = sp.getString("adblock_upstream", "adult") ?: "adult"
+        set(v) = sp.edit().putString("adblock_upstream", v).apply()
+
     // ---- Usage data ----------------------------------------------------------
 
     fun addUsage(pkg: String, ms: Long, day: String = today()) {

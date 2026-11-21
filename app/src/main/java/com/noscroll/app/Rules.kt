@@ -1,5 +1,6 @@
 package com.noscroll.app
 
+import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
@@ -9,6 +10,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  * two independent signals:
  *  1. [viewIds]   – IDs of the full-screen Reels/Shorts player.
  *  2. [tabLabels] – the bottom/top navigation tab for the feed, when it is the selected tab.
+ *  3. [fullScreenIdHints] – any view whose ID contains one of these words *and* fills most
+ *     of the screen (so a small nav button with the same word doesn't count).
  *
  * If a rule matches, the service presses Back to leave the feed, which keeps the
  * rest of the app (home feed, DMs, search, profiles, normal videos) usable.
@@ -21,6 +24,7 @@ data class AppRule(
     val packages: List<String>,
     val viewIds: List<String> = emptyList(),
     val tabLabels: List<String> = emptyList(),
+    val fullScreenIdHints: List<String> = emptyList(),
     val blockWholeApp: Boolean = false,
 ) {
     fun matches(root: AccessibilityNodeInfo): Boolean {
@@ -33,6 +37,31 @@ data class AppRule(
         }
         for (label in tabLabels) {
             if (isSelectedTab(root, label)) return true
+        }
+        if (fullScreenIdHints.isNotEmpty() && hasFullScreenView(root)) return true
+        return false
+    }
+
+    /** Walks the screen looking for a large view whose ID mentions the feed. */
+    private fun hasFullScreenView(root: AccessibilityNodeInfo): Boolean {
+        val screen = Rect()
+        root.getBoundsInScreen(screen)
+        val minHeight = screen.height() * 0.6
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var visited = 0
+        val bounds = Rect()
+        while (queue.isNotEmpty() && visited < MAX_NODES) {
+            val node = queue.removeFirst()
+            visited++
+            val id = node.viewIdResourceName?.lowercase()
+            if (id != null && fullScreenIdHints.any { id.contains(it) } && node.isVisibleToUser) {
+                node.getBoundsInScreen(bounds)
+                if (bounds.height() >= minHeight) return true
+            }
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(it) }
+            }
         }
         return false
     }
@@ -52,6 +81,8 @@ data class AppRule(
     }
 }
 
+private const val MAX_NODES = 600
+
 object Rules {
     val all = listOf(
         AppRule(
@@ -66,6 +97,8 @@ object Rules {
             ),
             // Instagram marks the Reels nav button as selected when you're on it.
             tabLabels = listOf("Reels"),
+            // Note: "reel_viewer" is Instagram's *Stories* viewer, so it's deliberately not here.
+            fullScreenIdHints = listOf("clips_viewer"),
         ),
         AppRule(
             key = "youtube",
@@ -79,6 +112,7 @@ object Rules {
                 "reel_watch_fragment_root",
             ),
             tabLabels = listOf("Shorts"),
+            fullScreenIdHints = listOf("reel_watch", "reel_player", "shorts_player"),
         ),
         AppRule(
             key = "facebook",
@@ -89,10 +123,12 @@ object Rules {
         ),
         AppRule(
             key = "snapchat",
-            title = "Snapchat Spotlight",
-            subtitle = "Chats, camera and Stories still work",
+            title = "Snapchat Spotlight (Snap reels)",
+            subtitle = "Chats, camera and friends' Stories still work",
             packages = listOf("com.snapchat.android"),
             tabLabels = listOf("Spotlight"),
+            // Catches Spotlight videos opened from the Stories/Discover page or a chat, too.
+            fullScreenIdHints = listOf("spotlight"),
         ),
         AppRule(
             key = "tiktok",

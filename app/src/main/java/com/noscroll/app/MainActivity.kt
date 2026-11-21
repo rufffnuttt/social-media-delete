@@ -2,6 +2,8 @@ package com.noscroll.app
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.TimePickerDialog
+import android.net.VpnService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
@@ -44,12 +46,23 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btn_dns).setOnClickListener { setUpPrivateDns() }
 
         buildFeedRules()
+        buildSleepSettings()
         buildSettings()
         buildAdultSettings()
+        buildAdBlockSettings()
+
+        // Keep the ad blocker running if it was on (e.g. after the app was updated).
+        if (prefs.adBlockEnabled && !AdBlockVpnService.running && VpnService.prepare(this) == null) {
+            AdBlockVpnService.start(this)
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        refreshStatus()
+    }
+
+    private fun refreshStatus() {
         val on = isServiceEnabled()
         val status = findViewById<TextView>(R.id.status)
         status.text = if (on) "● NoScroll is ON" else "● NoScroll is OFF"
@@ -57,7 +70,21 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.setup_card).visibility = if (on) View.GONE else View.VISIBLE
         findViewById<TextView>(R.id.stats).text =
             "Blocked today: ${prefs.todayBlocked}   ·   All time: ${prefs.totalBlocked}"
+        val banner = findViewById<TextView>(R.id.lock_banner)
+        when {
+            Sleep.isLocked(prefs) -> {
+                banner.text = "🌙 Sleep mode is on with strict lock. Settings can't be changed until " +
+                    "${Sleep.formatTime(prefs.sleepEnd)}."
+                banner.visibility = View.VISIBLE
+            }
+            Sleep.isActive(prefs) -> {
+                banner.text = "🌙 Sleep mode is on until ${Sleep.formatTime(prefs.sleepEnd)}."
+                banner.visibility = View.VISIBLE
+            }
+            else -> banner.visibility = View.GONE
+        }
         refreshUsage()
+        refreshRows()
     }
 
     // ---- Screen time ---------------------------------------------------------
@@ -123,10 +150,164 @@ class MainActivity : Activity() {
             { prefs.breakReminderMin }, { prefs.breakReminderMin = it },
         ))
         list.addView(switchRow(
+            "Allow \"5 more minutes\"",
+            "Offer a short extension on the daily-limit screen",
+            prefs.allowLimitSnooze,
+        ) { prefs.allowLimitSnooze = it })
+        list.addView(switchRow(
             "Take-a-breath pause",
-            "5-second pause each time you open a social app",
+            "Short pause each time you open a social app",
             prefs.mindfulPause,
         ) { prefs.mindfulPause = it })
+        list.addView(choiceRow(
+            "Pause length", "How long before the app can be opened",
+            listOf(3, 5, 10, 15, 30),
+            { prefs.pauseSeconds }, { prefs.pauseSeconds = it },
+            label = { "$it sec" },
+        ))
+    }
+
+    private fun buildSleepSettings() {
+        val list = findViewById<LinearLayout>(R.id.sleep_list)
+        list.addView(switchRow(
+            "Sleep mode",
+            "Blocks social media completely during your sleep hours",
+            prefs.sleepEnabled,
+        ) { prefs.sleepEnabled = it; refreshStatus() })
+        list.addView(actionRow("Starts", { Sleep.formatTime(prefs.sleepStart) }) { refresh ->
+            pickTime(prefs.sleepStart) { prefs.sleepStart = it; refresh() }
+        })
+        list.addView(actionRow("Ends", { Sleep.formatTime(prefs.sleepEnd) }) { refresh ->
+            pickTime(prefs.sleepEnd) { prefs.sleepEnd = it; refresh() }
+        })
+        list.addView(actionRow("Nights", { Sleep.describeDays(prefs.sleepDays) }) { refresh ->
+            val checked = BooleanArray(7) { (prefs.sleepDays and (1 shl it)) != 0 }
+            AlertDialog.Builder(this)
+                .setTitle("Which nights?")
+                .setMultiChoiceItems(Sleep.dayNames.toTypedArray(), checked) { _, i, v -> checked[i] = v }
+                .setPositiveButton("Save") { _, _ ->
+                    prefs.sleepDays = checked.indices.filter { checked[it] }.sumOf { 1 shl it }
+                    refresh()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        })
+        list.addView(actionRow("Apps blocked", {
+            val n = prefs.sleepApps.size
+            val all = TrackedApps.names.values.toSet().size
+            if (n >= all) "All social apps" else "$n of $all apps"
+        }) { refresh ->
+            val names = TrackedApps.names.values.distinct()
+            val checked = BooleanArray(names.size) { names[it] in prefs.sleepApps }
+            AlertDialog.Builder(this)
+                .setTitle("Block during sleep")
+                .setMultiChoiceItems(names.toTypedArray(), checked) { _, i, v -> checked[i] = v }
+                .setPositiveButton("Save") { _, _ ->
+                    prefs.sleepApps = names.filterIndexed { i, _ -> checked[i] }.toSet()
+                    refresh()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        })
+        list.addView(switchRow(
+            "Block their websites too",
+            "Instagram.com, YouTube.com, TikTok.com… in browsers",
+            prefs.sleepBlockBrowsers,
+        ) { prefs.sleepBlockBrowsers = it })
+        list.addView(switchRow(
+            "Allow emergency unlock",
+            "Unlock for 5 minutes after waiting 30 seconds",
+            prefs.sleepAllowUnlock,
+        ) { prefs.sleepAllowUnlock = it })
+        list.addView(switchRow(
+            "Strict lock",
+            "During sleep, NoScroll can't be turned off, changed or uninstalled",
+            prefs.sleepStrict,
+        ) { prefs.sleepStrict = it })
+    }
+
+    private fun buildAdBlockSettings() {
+        val list = findViewById<LinearLayout>(R.id.adblock_list)
+        list.addView(switchRow(
+            "Block ads & trackers",
+            "In all apps and browsers",
+            prefs.adBlockEnabled,
+        ) { on ->
+            if (on) {
+                val consent = VpnService.prepare(this)
+                if (consent != null) {
+                    // Android asks the user once to allow NoScroll to set up a VPN.
+                    startActivityForResult(consent, REQUEST_VPN)
+                } else {
+                    prefs.adBlockEnabled = true
+                    AdBlockVpnService.start(this)
+                }
+            } else {
+                prefs.adBlockEnabled = false
+                AdBlockVpnService.stop(this)
+            }
+        }.also { adBlockRow = it })
+        list.addView(actionRow("Filter adult sites in all apps", {
+            if (prefs.adBlockUpstream == "adult") "On (CleanBrowsing adult filter + SafeSearch)" else "Off"
+        }) { refresh ->
+            prefs.adBlockUpstream = if (prefs.adBlockUpstream == "adult") "plain" else "adult"
+            refresh()
+            Toast.makeText(this, "Takes effect for new lookups", Toast.LENGTH_SHORT).show()
+        })
+        list.addView(actionRow("Always-on VPN", { "Keeps the ad blocker running after restarts" }, plainTitle = true) {
+            try {
+                startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+                Toast.makeText(this, "Tap ⚙ next to NoScroll → Always-on VPN", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {}
+        })
+    }
+
+    private var adBlockRow: View? = null
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_VPN) return
+        val ok = resultCode == RESULT_OK
+        prefs.adBlockEnabled = ok
+        if (ok) AdBlockVpnService.start(this)
+        adBlockRow?.findViewById<Switch>(R.id.rule_switch)?.isChecked = ok
+    }
+
+    private fun pickTime(current: Int, onPicked: (Int) -> Unit) {
+        TimePickerDialog(this, { _, h, m -> onPicked(h * 60 + m) }, current / 60, current % 60, false).show()
+    }
+
+    // Rows that show a live value and need refreshing in onResume.
+    private val refreshers = mutableListOf<() -> Unit>()
+
+    private fun refreshRows() = refreshers.forEach { it() }
+
+    private fun locked(): Boolean {
+        if (!Sleep.isLocked(prefs)) return false
+        Toast.makeText(this, "Locked until ${Sleep.formatTime(prefs.sleepEnd)} (sleep mode)", Toast.LENGTH_SHORT).show()
+        return true
+    }
+
+    /** A row with a title and a value underneath; tapping it runs [onClick]. */
+    private fun actionRow(
+        title: String,
+        value: () -> String,
+        plainTitle: Boolean = false,
+        onClick: (refresh: () -> Unit) -> Unit,
+    ): View {
+        val row = layoutInflater.inflate(R.layout.row_rule, null, false)
+        row.findViewById<Switch>(R.id.rule_switch).visibility = View.GONE
+        row.findViewById<TextView>(R.id.rule_title).text = title
+        val sub = row.findViewById<TextView>(R.id.rule_subtitle)
+        if (!plainTitle) sub.setTextColor(getColor(R.color.accent))
+        val refresh = { sub.text = value() }
+        refresh()
+        refreshers += refresh
+        row.setOnClickListener { if (!locked()) onClick(refresh) }
+        row.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        return row
     }
 
     private fun buildAdultSettings() {
@@ -164,7 +345,17 @@ class MainActivity : Activity() {
         row.findViewById<TextView>(R.id.rule_subtitle).text = subtitle
         val sw = row.findViewById<Switch>(R.id.rule_switch)
         sw.isChecked = checked
-        sw.setOnCheckedChangeListener { _, v -> onChange(v) }
+        var reverting = false
+        sw.setOnCheckedChangeListener { _, v ->
+            if (reverting) return@setOnCheckedChangeListener
+            if (locked()) {
+                reverting = true
+                sw.isChecked = !v
+                reverting = false
+            } else {
+                onChange(v)
+            }
+        }
         row.setOnClickListener { sw.toggle() }
         row.layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -178,15 +369,16 @@ class MainActivity : Activity() {
         options: List<Int>,
         get: () -> Int,
         set: (Int) -> Unit,
+        label: (Int) -> String = { if (it == 0) "Off" else formatDuration(it * 60_000L) },
     ): View {
         val row = layoutInflater.inflate(R.layout.row_rule, null, false)
         row.findViewById<Switch>(R.id.rule_switch).visibility = View.GONE
         val titleView = row.findViewById<TextView>(R.id.rule_title)
         row.findViewById<TextView>(R.id.rule_subtitle).text = subtitle
-        fun label(min: Int) = if (min == 0) "Off" else formatDuration(min * 60_000L)
         fun refresh() { titleView.text = "$title:  ${label(get())}" }
         refresh()
         row.setOnClickListener {
+            if (locked()) return@setOnClickListener
             AlertDialog.Builder(this)
                 .setTitle(title)
                 .setSingleChoiceItems(
@@ -203,6 +395,10 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
         )
         return row
+    }
+
+    companion object {
+        private const val REQUEST_VPN = 42
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
