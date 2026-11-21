@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NoScroll</string>
+    <string name="service_label">NoScroll – Reels &amp; Shorts blocker</string>
+    <string name="service_description">NoScroll watches Instagram, YouTube, TikTok, Facebook and Snapchat only to detect when a Reels / Shorts / short-video feed is on screen, and presses Back (or Home for TikTok) to close it. It does not read your messages, collect data, or use the internet — everything stays on your phone.</string>
+</resources>
