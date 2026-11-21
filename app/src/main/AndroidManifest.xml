@@ -31,6 +31,10 @@
         </activity>
 
         <activity
+            android:name=".ProActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".InterruptActivity"
             android:excludeFromRecents="true"
             android:exported="false"
@@ -49,14 +53,6 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/blocker_service" />
-        </service>
-        <service
-            android:name=".AdBlockVpnService"
-            android:exported="true"
-            android:permission="android.permission.BIND_VPN_SERVICE">
-            <intent-filter>
-                <action android:name="android.net.VpnService" />
-            </intent-filter>
         </service>
     </application>
 </manifest>

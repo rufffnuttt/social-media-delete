@@ -74,6 +74,8 @@ class BlockerService : AccessibilityService() {
         }
         registerReceiver(screenReceiver, filter)
         handler.postDelayed(tickRunnable, TICK_MS)
+        // Re-check purchases (e.g. a subscription that was cancelled).
+        try { Store.refresh(this) } catch (e: Exception) {}
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -99,7 +101,7 @@ class BlockerService : AccessibilityService() {
         }
 
         val watchBrowser = Browsers.isBrowser(pkg) &&
-            (prefs.blockAdult || (prefs.sleepBlockBrowsers && Sleep.isActive(prefs)))
+            (prefs.blockAdultActive || (prefs.sleepBlockBrowsers && Sleep.isActive(prefs)))
         val watchSettings = pkg in PROTECTED_PKGS && Sleep.isLocked(prefs)
         if ((enabledRule || watchBrowser || watchSettings) && !checkPending) {
             // Coalesce the flood of content-changed events into one check every ~100ms.
@@ -131,7 +133,7 @@ class BlockerService : AccessibilityService() {
 
         if (Browsers.isBrowser(pkg)) {
             val url = try { Browsers.readUrl(root) } catch (e: Exception) { null } ?: return
-            if (prefs.blockAdult && AdultFilter.isAdult(url)) {
+            if (prefs.blockAdultActive && AdultFilter.isAdult(url)) {
                 blockAdult()
             } else if (prefs.sleepBlockBrowsers && Sleep.isActive(prefs)) {
                 val app = SocialSites.appFor(url)
@@ -248,13 +250,13 @@ class BlockerService : AccessibilityService() {
 
         when {
             limitReached() -> showInterrupt(InterruptActivity.MODE_LIMIT, pkg, force = true)
-            freshOpen && prefs.mindfulPause && !InterruptActivity.hasPass(pkg) ->
+            freshOpen && prefs.mindfulPauseActive && !InterruptActivity.hasPass(pkg) ->
                 showInterrupt(InterruptActivity.MODE_PAUSE, pkg)
         }
     }
 
     private fun limitReached(): Boolean {
-        val limit = prefs.dailyLimitMin
+        val limit = prefs.dailyLimitActiveMin
         if (limit <= 0) return false
         if (System.currentTimeMillis() < prefs.limitSnoozeUntil) return false
         return prefs.totalUsageMs() >= limit * 60_000L

@@ -42,6 +42,37 @@
             android:textColor="@color/muted"
             android:textSize="14sp" />
 
+        <LinearLayout
+            android:id="@+id/pro_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="14dp">
+
+            <TextView
+                android:id="@+id/pro_line"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/text"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_pro"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/button"
+                android:paddingHorizontal="16dp"
+                android:text="Upgrade"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/lock_banner"
             android:layout_width="match_parent"
@@ -217,6 +248,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"
+            android:id="@+id/adblock_title"
             android:text="Ad blocker"
             android:textColor="@color/text"
             android:textSize="17sp"
@@ -231,6 +263,7 @@
             android:paddingVertical="4dp" />
 
         <TextView
+            android:id="@+id/adblock_desc"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -260,7 +293,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:lineSpacingExtra="3dp"
-                android:text="If you use the ad blocker above, it already filters adult sites in every app — skip this and keep Private DNS on Automatic. Otherwise, to cover all apps and force Google SafeSearch, set Android's Private DNS to a free adult filter:\n\n1. Tap the button (copies the address).\n2. Network &amp; internet (or Connections → More connection settings) → Private DNS.\n3. Choose Private DNS provider hostname, paste, Save."
+                android:text="If you use NoScroll's ad blocker, it already filters adult sites in every app, so skip this and keep Private DNS on Automatic. Otherwise, to cover all apps and force Google SafeSearch, set Android's Private DNS to a free adult filter:\n\n1. Tap the button (copies the address).\n2. Network &amp; internet (or Connections → More connection settings) → Private DNS.\n3. Choose Private DNS provider hostname, paste, Save."
                 android:textColor="@color/text"
                 android:textSize="14sp" />
 

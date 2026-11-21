@@ -48,6 +48,64 @@ settings to keep it running after restarts.
 - **Take-a-breath pause**: a pause screen (3–30 seconds, configurable) each time you open a social app,
   telling you how many times you've opened it today.
 
+## Free, Pro and the free trial
+
+| | Free | Pro |
+|---|---|---|
+| Reels / Shorts / Spotlight / TikTok blocking | ✅ | ✅ |
+| Screen time stats & break reminders | ✅ | ✅ |
+| Adult website blocking | | ✅ |
+| Daily limit & take-a-breath pause | | ✅ |
+| Sleep mode (incl. strict lock) | | ✅ |
+| Ad blocker (personal build only, see below) | | ✅ |
+
+- **7-day free trial** of everything in Pro, starting at install. No card needed.
+  When it ends, the upgrade screen opens once and Pro features switch off.
+- **Pro** is sold through Google Play as a monthly or yearly subscription, or a
+  one-time lifetime purchase.
+
+There are two versions, built from the same code:
+
+| | `play` (Google Play) | `full` (personal) |
+|---|---|---|
+| Package | `com.noscroll.app` | `com.noscroll.app.full` |
+| Pro | trial + Play billing | always unlocked |
+| Ad blocker | ❌ (Google Play doesn't allow blocking other apps' ads) | ✅ |
+| Where | Play Store (`NoScroll-play.aab` from the CI run) | GitHub release `NoScroll.apk` |
+
+## Publishing on Google Play
+
+1. **Developer account** – sign up at play.google.com/console ($25 one-time).
+2. **Upload key** – create one on your computer and keep it safe (losing it is painful):
+   ```sh
+   keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+   base64 -w0 upload.jks   # copy the output
+   ```
+   In GitHub → *Settings → Secrets and variables → Actions*, add:
+   `UPLOAD_KEYSTORE_BASE64` (the base64 text), `UPLOAD_KEYSTORE_PASSWORD`,
+   `UPLOAD_KEY_ALIAS` (`upload`), `UPLOAD_KEY_PASSWORD`. The next CI run signs the
+   Play bundle with it.
+3. **Create the app** in Play Console with package name `com.noscroll.app`
+   (if it's taken, change `applicationId` in `app/build.gradle.kts`), and upload
+   `NoScroll-play.aab` from the CI run's artifacts to an *Internal testing* track first.
+4. **Products** (*Monetize → Products*):
+   - Subscription **`noscroll_pro`** with base plans **`monthly`** and **`yearly`**
+     (auto-renewing). Example prices: $2.99 / month, $19.99 / year.
+   - In-app product **`noscroll_lifetime`**. Example price: $39.99.
+   The IDs must match exactly; they're in `app/src/play/java/com/noscroll/app/Store.kt`.
+5. **Policy forms** (*Policy → App content*):
+   - **Accessibility API** declaration: explain it detects short-video feeds, reads the
+     browser URL bar for adult-site blocking, and tracks app usage for screen time.
+     The app shows the required in-app disclosure before sending users to the setting.
+     Google may ask for a short video of the feature.
+   - **Privacy policy** URL (required). It can say no personal data is collected or shared.
+   - Data safety form: no data collected or shared.
+6. Test purchases with *License testing* accounts, then promote to production.
+
+Purchases are checked on the device using Google Play's billing library and cached
+so Pro works offline. For stronger protection against tampering you can add server-side
+verification with the Google Play Developer API later.
+
 ## How it works
 
 NoScroll uses Android's Accessibility feature (the same thing apps like
@@ -62,7 +120,9 @@ use is the ad blocker forwarding normal DNS lookups to a DNS server.
 
 1. On your Android phone, open
    **https://github.com/rufffnuttt/social-media-delete/releases/latest/download/NoScroll.apk**
-   (or go to the repo's **Releases** page and tap `NoScroll.apk`).
+   (or go to the repo's **Releases** page and tap `NoScroll.apk`). This is the personal
+   build with everything unlocked. If you installed an earlier version (before v1.1),
+   uninstall it first – the personal build now has its own package name.
 2. Open the downloaded file. If asked, allow your browser to *install unknown apps*.
    Play Protect may warn that the app is unknown – tap **Install anyway**.
 3. Open **NoScroll** and follow the two steps on screen:

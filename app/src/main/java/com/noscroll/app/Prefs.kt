@@ -3,8 +3,42 @@ package com.noscroll.app
 import android.content.Context
 import java.time.LocalDate
 
-class Prefs(context: Context) {
+class Prefs(private val context: Context) {
     private val sp = context.getSharedPreferences("noscroll", Context.MODE_PRIVATE)
+
+    // ---- Pro -----------------------------------------------------------------
+
+    /** "lifetime", "subscription", or "" (not purchased). Cached from the store. */
+    var proKind: String
+        get() = sp.getString("pro_kind", "") ?: ""
+        set(v) = sp.edit().putString("pro_kind", v).apply()
+
+    val isPro: Boolean get() = Pro.isActive(context)
+
+    /** Fallback trial start if the install time can't be read. */
+    val firstSeen: Long
+        get() {
+            val v = sp.getLong("first_seen", 0L)
+            if (v != 0L) return v
+            val now = System.currentTimeMillis()
+            sp.edit().putLong("first_seen", now).apply()
+            return now
+        }
+
+    var trialEndNoticeShown: Boolean
+        get() = sp.getBoolean("trial_end_notice", false)
+        set(v) = sp.edit().putBoolean("trial_end_notice", v).apply()
+
+    var disclosureAccepted: Boolean
+        get() = sp.getBoolean("disclosure_ok", false)
+        set(v) = sp.edit().putBoolean("disclosure_ok", v).apply()
+
+    // ---- Effective settings (Pro features switch off when Pro isn't active) ----
+
+    val blockAdultActive get() = blockAdult && isPro
+    val dailyLimitActiveMin get() = if (isPro) dailyLimitMin else 0
+    val mindfulPauseActive get() = mindfulPause && isPro
+    val sleepEnabledActive get() = sleepEnabled && isPro
 
     // ---- Feed blocking -------------------------------------------------------
 

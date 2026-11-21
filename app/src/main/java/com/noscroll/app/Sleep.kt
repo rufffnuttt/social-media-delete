@@ -11,7 +11,7 @@ object Sleep {
 
     /** True if the sleep schedule covers this moment (ignores the emergency unlock). */
     fun inSchedule(prefs: Prefs, now: LocalDateTime = LocalDateTime.now()): Boolean {
-        if (!prefs.sleepEnabled) return false
+        if (!prefs.sleepEnabledActive) return false
         val start = prefs.sleepStart
         val end = prefs.sleepEnd
         val t = now.hour * 60 + now.minute
