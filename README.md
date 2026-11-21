@@ -64,8 +64,9 @@ settings to keep it running after restarts.
 - **Pro** is sold on the DB Audio Services website with **Stripe** (monthly, yearly or
   lifetime). Users **sign in with Google** in the app; Pro is tied to that Google account,
   so it works on every phone where they sign in. "Restore purchase" re-checks it.
-- The website side lives in the `dbaudioservices` repo (branch `noscroll-pro`); see its
-  `NOSCROLL.md` for the Stripe and Google setup.
+- The app works with any website that implements the small API in
+  [`docs/SERVER_API.md`](docs/SERVER_API.md). A reference implementation is in the
+  `dbaudioservices` repo (branch `noscroll-pro`, setup in its `NOSCROLL.md`).
 
 There are two versions, built from the same code:
 
