@@ -45,6 +45,43 @@
             android:textSize="13sp" />
 
         <LinearLayout
+            android:id="@+id/account_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/account_line"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_signin"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/button"
+                android:text="Sign in with Google"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF" />
+
+            <Button
+                android:id="@+id/btn_signout"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
+                android:background="@android:color/transparent"
+                android:text="Sign out"
+                android:textAllCaps="false"
+                android:textColor="@color/muted" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/plans_section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -79,7 +116,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:lineSpacingExtra="2dp"
-                android:text="Payment is charged to your Google Play account. Subscriptions renew automatically until cancelled; cancel anytime in Google Play → Payments &amp; subscriptions at least 24 hours before renewal. Lifetime is a single payment."
+                android:text="Secure checkout by Stripe on the DB Audio Services website. Pro is linked to your Google account and works on every phone where you sign in. Subscriptions renew automatically until cancelled; cancel anytime with Manage subscription. Lifetime is a single payment."
                 android:textColor="@color/muted"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -90,7 +127,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:background="@drawable/card"
-            android:text="Restore purchases"
+            android:text="Restore purchase"
             android:textAllCaps="false"
             android:textColor="@color/accent" />
 

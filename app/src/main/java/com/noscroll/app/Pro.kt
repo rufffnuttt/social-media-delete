@@ -23,7 +23,7 @@ data class Plan(
  */
 object Pro {
     const val TRIAL_DAYS = 7
-    private const val DAY_MS = 24L * 60 * 60 * 1000
+    const val DAY_MS = 24L * 60 * 60 * 1000
 
     val features = listOf(
         "🔞" to "Block adult websites",
@@ -32,11 +32,21 @@ object Pro {
         "🌿" to "Take-a-breath pause before social apps",
     ) + if (AdBlockFeature.available) listOf("🛡️" to "Ad & tracker blocker") else emptyList()
 
-    fun isActive(context: Context): Boolean =
-        Store.ALWAYS_PRO || Prefs(context).proKind.isNotEmpty() || trialActive(context)
+    // Keep Pro for a few days past the paid period if the phone can't reach the website.
+    private const val OFFLINE_GRACE_MS = 3 * DAY_MS
 
-    fun isPurchased(context: Context): Boolean =
-        Store.ALWAYS_PRO || Prefs(context).proKind.isNotEmpty()
+    fun isActive(context: Context): Boolean = isPurchased(context) || trialActive(context)
+
+    fun isPurchased(context: Context): Boolean {
+        if (Store.ALWAYS_PRO) return true
+        val prefs = Prefs(context)
+        return when (prefs.proKind) {
+            "lifetime" -> true
+            "subscription" -> prefs.proUntil == 0L ||
+                System.currentTimeMillis() < prefs.proUntil + OFFLINE_GRACE_MS
+            else -> false
+        }
+    }
 
     @Volatile private var cachedTrialEnd = 0L
 
@@ -65,7 +75,7 @@ object Pro {
         return when {
             Store.ALWAYS_PRO -> "Personal build · all features unlocked"
             kind == "lifetime" -> "⭐ NoScroll Pro · Lifetime"
-            kind == "subscription" -> "⭐ NoScroll Pro · Subscription active"
+            kind == "subscription" && isPurchased(context) -> "⭐ NoScroll Pro · Subscription active"
             trialActive(context) -> {
                 val d = trialDaysLeft(context)
                 "Free trial · $d day${if (d == 1) "" else "s"} of Pro left"

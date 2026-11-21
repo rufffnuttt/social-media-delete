@@ -49,6 +49,8 @@ jobs:
           UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
           UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
           UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+          NOSCROLL_SITE_URL: ${{ vars.NOSCROLL_SITE_URL }}
+          NOSCROLL_GOOGLE_WEB_CLIENT_ID: ${{ vars.NOSCROLL_GOOGLE_WEB_CLIENT_ID }}
         run: |
           chmod +x gradlew
           # The runner ships with the Android SDK; just make sure licenses are accepted.

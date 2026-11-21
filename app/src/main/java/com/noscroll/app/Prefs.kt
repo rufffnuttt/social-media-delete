@@ -8,10 +8,24 @@ class Prefs(private val context: Context) {
 
     // ---- Pro -----------------------------------------------------------------
 
-    /** "lifetime", "subscription", or "" (not purchased). Cached from the store. */
+    /** "lifetime", "subscription", or "" (not purchased). Cached from the website. */
     var proKind: String
         get() = sp.getString("pro_kind", "") ?: ""
         set(v) = sp.edit().putString("pro_kind", v).apply()
+
+    /** For subscriptions: when the paid period ends (ms). 0 for lifetime. */
+    var proUntil: Long
+        get() = sp.getLong("pro_until", 0L)
+        set(v) = sp.edit().putLong("pro_until", v).apply()
+
+    /** Website session token for the signed-in Google account. */
+    var authToken: String
+        get() = sp.getString("auth_token", "") ?: ""
+        set(v) = sp.edit().putString("auth_token", v).apply()
+
+    var accountEmail: String
+        get() = sp.getString("account_email", "") ?: ""
+        set(v) = sp.edit().putString("account_email", v).apply()
 
     val isPro: Boolean get() = Pro.isActive(context)
 

@@ -94,7 +94,9 @@ class MainActivity : Activity() {
     }
 
     private fun refreshStatus() {
-        findViewById<TextView>(R.id.pro_line).text = Pro.statusLine(this)
+        val email = prefs.accountEmail
+        findViewById<TextView>(R.id.pro_line).text =
+            Pro.statusLine(this) + if (Store.IS_STORE_BUILD && email.isNotEmpty()) "\n$email" else ""
         findViewById<View>(R.id.btn_pro).visibility = if (Pro.isPurchased(this)) View.GONE else View.VISIBLE
         // When the trial ends: switch off the ad blocker and show the upgrade screen once.
         if (!prefs.isPro) {

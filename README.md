@@ -61,50 +61,61 @@ settings to keep it running after restarts.
 
 - **7-day free trial** of everything in Pro, starting at install. No card needed.
   When it ends, the upgrade screen opens once and Pro features switch off.
-- **Pro** is sold through Google Play as a monthly or yearly subscription, or a
-  one-time lifetime purchase.
+- **Pro** is sold on the DB Audio Services website with **Stripe** (monthly, yearly or
+  lifetime). Users **sign in with Google** in the app; Pro is tied to that Google account,
+  so it works on every phone where they sign in. "Restore purchase" re-checks it.
+- The website side lives in the `dbaudioservices` repo (branch `noscroll-pro`); see its
+  `NOSCROLL.md` for the Stripe and Google setup.
 
 There are two versions, built from the same code:
 
-| | `play` (Google Play) | `full` (personal) |
+| | `play` (store version) | `full` (personal) |
 |---|---|---|
 | Package | `com.noscroll.app` | `com.noscroll.app.full` |
-| Pro | trial + Play billing | always unlocked |
+| Pro | trial + Stripe via the website | always unlocked |
 | Ad blocker | ❌ (Google Play doesn't allow blocking other apps' ads) | ✅ |
 | Where | Play Store (`NoScroll-play.aab` from the CI run) | GitHub release `NoScroll.apk` |
 
-## Publishing on Google Play
+### Setting up the store version
 
-1. **Developer account** – sign up at play.google.com/console ($25 one-time).
-2. **Upload key** – create one on your computer and keep it safe (losing it is painful):
+1. **Website**: deploy the `noscroll-pro` branch of `dbaudioservices` and follow its
+   `NOSCROLL.md` (Stripe webhook, customer portal, `BASE_URL`).
+2. **Repository variables** (GitHub → Settings → Secrets and variables → Actions →
+   *Variables*):
+   - `NOSCROLL_SITE_URL` – the website's public https address
+   - `NOSCROLL_GOOGLE_WEB_CLIENT_ID` – the site's `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+3. **Upload key** (stable signing is also needed for Google sign-in to work):
    ```sh
    keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
    base64 -w0 upload.jks   # copy the output
+   keytool -list -v -keystore upload.jks -alias upload   # note the SHA1 fingerprint
    ```
-   In GitHub → *Settings → Secrets and variables → Actions*, add:
-   `UPLOAD_KEYSTORE_BASE64` (the base64 text), `UPLOAD_KEYSTORE_PASSWORD`,
-   `UPLOAD_KEY_ALIAS` (`upload`), `UPLOAD_KEY_PASSWORD`. The next CI run signs the
-   Play bundle with it.
-3. **Create the app** in Play Console with package name `com.noscroll.app`
-   (if it's taken, change `applicationId` in `app/build.gradle.kts`), and upload
-   `NoScroll-play.aab` from the CI run's artifacts to an *Internal testing* track first.
-4. **Products** (*Monetize → Products*):
-   - Subscription **`noscroll_pro`** with base plans **`monthly`** and **`yearly`**
-     (auto-renewing). Example prices: $2.99 / month, $19.99 / year.
-   - In-app product **`noscroll_lifetime`**. Example price: $39.99.
-   The IDs must match exactly; they're in `app/src/play/java/com/noscroll/app/Store.kt`.
-5. **Policy forms** (*Policy → App content*):
-   - **Accessibility API** declaration: explain it detects short-video feeds, reads the
-     browser URL bar for adult-site blocking, and tracks app usage for screen time.
-     The app shows the required in-app disclosure before sending users to the setting.
-     Google may ask for a short video of the feature.
-   - **Privacy policy** URL (required). It can say no personal data is collected or shared.
-   - Data safety form: no data collected or shared.
-6. Test purchases with *License testing* accounts, then promote to production.
+   Add secrets `UPLOAD_KEYSTORE_BASE64`, `UPLOAD_KEYSTORE_PASSWORD`, `UPLOAD_KEY_ALIAS`
+   (`upload`), `UPLOAD_KEY_PASSWORD`.
+4. **Google Cloud Console** (same project as the website's Google sign-in) → Credentials →
+   *Create OAuth client ID* → **Android**, package `com.noscroll.app`, SHA-1 from step 3.
+   If you publish on Google Play, add a second Android client with the SHA-1 of Play's
+   *app signing key* (Play Console → Setup → App signing).
 
-Purchases are checked on the device using Google Play's billing library and cached
-so Pro works offline. For stronger protection against tampering you can add server-side
-verification with the Google Play Developer API later.
+### Google Play and Stripe ⚠️
+
+Google Play's Payments policy requires Google Play Billing for unlocking app features
+in apps distributed on Play. Selling Pro through Stripe from a Play-installed app is only
+allowed under specific programs (e.g. user-choice / external-offers programs in some
+countries, which require enrolment and still carry Google fees). Without that, the app
+can be rejected or removed. The safest options are distributing the store version from
+your own website instead of Play, or enrolling in the relevant Google program before
+publishing.
+
+### Publishing on Google Play
+
+1. Developer account at play.google.com/console ($25 one-time).
+2. Create the app with package `com.noscroll.app` (change `applicationId` in
+   `app/build.gradle.kts` if taken) and upload `NoScroll-play.aab` from a CI run.
+3. *Policy → App content*: **Accessibility API** declaration (detects short-video feeds,
+   reads the browser URL bar for adult-site blocking, tracks app usage for screen time;
+   the app shows the required disclosure first), **privacy policy** URL, data safety
+   form (account email is collected for sign-in and purchases).
 
 ## How it works
 

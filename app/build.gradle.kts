@@ -11,8 +11,24 @@ android {
         applicationId = "com.noscroll.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
+
+        // Where Pro is sold, and the Google OAuth *web* client ID the website uses
+        // (NEXT_PUBLIC_GOOGLE_CLIENT_ID). Set as GitHub repository variables
+        // NOSCROLL_SITE_URL / NOSCROLL_GOOGLE_WEB_CLIENT_ID, or in gradle.properties.
+        fun setting(env: String, prop: String): String =
+            System.getenv(env)?.takeIf { it.isNotBlank() }
+                ?: (project.findProperty(prop) as String?) ?: ""
+        buildConfigField("String", "SITE_URL", "\"${setting("NOSCROLL_SITE_URL", "noscroll.siteUrl")}\"")
+        buildConfigField(
+            "String", "GOOGLE_WEB_CLIENT_ID",
+            "\"${setting("NOSCROLL_GOOGLE_WEB_CLIENT_ID", "noscroll.googleWebClientId")}\"",
+        )
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     // Upload key for Google Play, supplied by CI secrets (see README).
@@ -31,7 +47,8 @@ android {
 
     flavorDimensions += "store"
     productFlavors {
-        // Google Play: free + 7-day trial + Pro via Play billing. No ad blocker (Play policy).
+        // Store version: free + 7-day trial + Pro bought with Stripe on the website,
+        // Google sign-in. No ad blocker (Google Play policy).
         create("play") {
             dimension = "store"
         }
@@ -60,5 +77,8 @@ android {
 }
 
 dependencies {
-    "playImplementation"("com.android.billingclient:billing:7.1.1")
+    // Sign in with Google (Credential Manager).
+    "playImplementation"("androidx.credentials:credentials:1.3.0")
+    "playImplementation"("androidx.credentials:credentials-play-services-auth:1.3.0")
+    "playImplementation"("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 }

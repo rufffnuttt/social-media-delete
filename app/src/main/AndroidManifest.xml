@@ -30,9 +30,18 @@
             </intent-filter>
         </activity>
 
+        <!-- The website's "Open the NoScroll app" button (noscroll://pro) lands here after payment. -->
         <activity
             android:name=".ProActivity"
-            android:exported="false" />
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="noscroll" android:host="pro" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".InterruptActivity"

@@ -2,153 +2,213 @@ package com.noscroll.app
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
-import com.android.billingclient.api.AcknowledgePurchaseParams
-import com.android.billingclient.api.BillingClient
-import com.android.billingclient.api.BillingClient.BillingResponseCode
-import com.android.billingclient.api.BillingClient.ProductType
-import com.android.billingclient.api.BillingClientStateListener
-import com.android.billingclient.api.BillingFlowParams
-import com.android.billingclient.api.BillingResult
-import com.android.billingclient.api.PendingPurchasesParams
-import com.android.billingclient.api.ProductDetails
-import com.android.billingclient.api.Purchase
-import com.android.billingclient.api.PurchasesUpdatedListener
-import com.android.billingclient.api.QueryProductDetailsParams
-import com.android.billingclient.api.QueryPurchasesParams
+import androidx.credentials.CredentialManager
+import androidx.credentials.CredentialManagerCallback
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executor
+import kotlin.concurrent.thread
 
 /**
- * Google Play billing.
- *
- * Products to create in Play Console (Monetize → Products):
- *  - Subscription  "noscroll_pro"  with base plans "monthly" and "yearly"
- *  - In-app product "noscroll_lifetime" (one-time purchase)
+ * Pro via the DB Audio Services website: Google sign-in in the app, payment with
+ * Stripe on the website, and the website tells the app whether the account has Pro.
+ * Site address and Google client ID come from BuildConfig (see README).
  */
 object Store {
     const val ALWAYS_PRO = false
     const val IS_STORE_BUILD = true
 
-    const val SUBSCRIPTION_ID = "noscroll_pro"
-    const val LIFETIME_ID = "noscroll_lifetime"
-    const val PLAN_MONTHLY = "monthly"
-    const val PLAN_YEARLY = "yearly"
-
     private val main = Handler(Looper.getMainLooper())
-    private var client: BillingClient? = null
-    private var appContext: Context? = null
-    private var onPurchaseDone: (() -> Unit)? = null
+    private val mainExecutor = Executor { main.post(it) }
+    private val site get() = BuildConfig.SITE_URL.trimEnd('/')
 
-    private val purchasesListener = PurchasesUpdatedListener { result, purchases ->
-        if (result.responseCode == BillingResponseCode.OK && purchases != null) {
-            appContext?.let { ctx -> refresh(ctx) { onPurchaseDone?.invoke() } }
-        }
-    }
+    val isConfigured: Boolean
+        get() = site.startsWith("https://") && !site.contains("YOUR-") &&
+            BuildConfig.GOOGLE_WEB_CLIENT_ID.endsWith(".apps.googleusercontent.com")
 
-    private fun connect(context: Context, onReady: (BillingClient) -> Unit) {
-        appContext = context.applicationContext
-        val c = client ?: BillingClient.newBuilder(context.applicationContext)
-            .setListener(purchasesListener)
-            .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
-            .build()
-            .also { client = it }
-        if (c.isReady) {
-            onReady(c)
+    fun isSignedIn(context: Context) = Prefs(context).authToken.isNotEmpty()
+
+    // ---- Sign in with Google ----------------------------------------------------
+
+    /** Shows Google's account picker, then signs in to the website. onDone(error or null). */
+    fun signIn(activity: Activity, onDone: (String?) -> Unit) {
+        if (!isConfigured) {
+            onDone("Sign-in isn't set up in this build yet.")
             return
         }
-        c.startConnection(object : BillingClientStateListener {
-            override fun onBillingSetupFinished(result: BillingResult) {
-                if (result.responseCode == BillingResponseCode.OK) main.post { onReady(c) }
-            }
+        val option = GetSignInWithGoogleOption.Builder(BuildConfig.GOOGLE_WEB_CLIENT_ID).build()
+        val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+        CredentialManager.create(activity).getCredentialAsync(
+            activity, request, CancellationSignal(), mainExecutor,
+            object : CredentialManagerCallback<GetCredentialResponse, GetCredentialException> {
+                override fun onResult(result: GetCredentialResponse) {
+                    val cred = result.credential
+                    if (cred is CustomCredential &&
+                        cred.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                    ) {
+                        val idToken = GoogleIdTokenCredential.createFrom(cred.data).idToken
+                        exchangeToken(activity, idToken, onDone)
+                    } else {
+                        onDone("Unexpected sign-in response")
+                    }
+                }
 
-            override fun onBillingServiceDisconnected() {
-                // Reconnects on the next call.
-            }
-        })
+                override fun onError(e: GetCredentialException) {
+                    onDone(e.message ?: "Sign-in was cancelled")
+                }
+            },
+        )
     }
 
-    /** Re-checks what the user owns and saves it, so Pro also works offline. */
+    private fun exchangeToken(context: Context, idToken: String, onDone: (String?) -> Unit) {
+        val prefs = Prefs(context)
+        request("POST", "/api/noscroll/auth", JSONObject().put("idToken", idToken), token = null) { code, json ->
+            if (code == 200 && json != null && json.optString("token").isNotEmpty()) {
+                prefs.authToken = json.getString("token")
+                prefs.accountEmail = json.optString("email")
+                saveStatus(prefs, json)
+                onDone(null)
+            } else {
+                onDone(json?.optString("error")?.takeIf { it.isNotEmpty() } ?: "Couldn't sign in (error $code)")
+            }
+        }
+    }
+
+    fun signOut(context: Context, onDone: () -> Unit = {}) {
+        val prefs = Prefs(context)
+        val token = prefs.authToken
+        prefs.authToken = ""
+        prefs.accountEmail = ""
+        prefs.proKind = ""
+        prefs.proUntil = 0L
+        if (token.isNotEmpty()) request("POST", "/api/noscroll/logout", null, token) { _, _ -> }
+        onDone()
+    }
+
+    // ---- Pro status ---------------------------------------------------------------
+
+    /** Asks the website whether this account has Pro and caches it (so it works offline). */
     fun refresh(context: Context, onDone: () -> Unit = {}) {
         val prefs = Prefs(context)
-        connect(context) { c ->
-            querySubs(c) { subs ->
-                queryInApp(c) { inApp ->
-                    val owned = (subs + inApp).filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
-                    owned.filter { !it.isAcknowledged }.forEach { acknowledge(c, it) }
-                    prefs.proKind = when {
-                        owned.any { LIFETIME_ID in it.products } -> "lifetime"
-                        owned.any { SUBSCRIPTION_ID in it.products } -> "subscription"
-                        else -> ""
-                    }
-                    main.post(onDone)
-                }
+        val token = prefs.authToken
+        if (token.isEmpty() || !isConfigured) {
+            main.post(onDone)
+            return
+        }
+        request("GET", "/api/noscroll/status", null, token) { code, json ->
+            when {
+                code == 200 && json != null -> saveStatus(prefs, json)
+                code == 401 -> signOut(context)        // session revoked or expired
+                // Network errors: keep the cached status.
             }
+            onDone()
         }
     }
 
-    private fun querySubs(c: BillingClient, cb: (List<Purchase>) -> Unit) {
-        c.queryPurchasesAsync(
-            QueryPurchasesParams.newBuilder().setProductType(ProductType.SUBS).build()
-        ) { result, list -> cb(if (result.responseCode == BillingResponseCode.OK) list else emptyList()) }
+    private fun saveStatus(prefs: Prefs, json: JSONObject) {
+        if (json.optBoolean("pro")) {
+            val lifetime = json.optString("plan") == "lifetime"
+            prefs.proKind = if (lifetime) "lifetime" else "subscription"
+            prefs.proUntil = if (lifetime) 0L else json.optLong("expiresAt", 0L)
+        } else {
+            prefs.proKind = ""
+            prefs.proUntil = 0L
+        }
     }
 
-    private fun queryInApp(c: BillingClient, cb: (List<Purchase>) -> Unit) {
-        c.queryPurchasesAsync(
-            QueryPurchasesParams.newBuilder().setProductType(ProductType.INAPP).build()
-        ) { result, list -> cb(if (result.responseCode == BillingResponseCode.OK) list else emptyList()) }
-    }
+    // ---- Plans, checkout, billing portal ------------------------------------------
 
-    private fun acknowledge(c: BillingClient, purchase: Purchase) {
-        c.acknowledgePurchase(
-            AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()
-        ) { }
-    }
-
-    /** Loads the three plans with prices in the user's local currency. */
     fun loadPlans(context: Context, onLoaded: (List<Plan>) -> Unit) {
-        connect(context) { c ->
-            queryDetails(c, SUBSCRIPTION_ID, ProductType.SUBS) { sub ->
-                queryDetails(c, LIFETIME_ID, ProductType.INAPP) { life ->
-                    val plans = mutableListOf<Plan>()
-                    sub?.subscriptionOfferDetails
-                        ?.filter { it.offerId == null }                       // base plans
-                        ?.forEach { offer ->
-                            val price = offer.pricingPhases.pricingPhaseList.lastOrNull()?.formattedPrice ?: return@forEach
-                            when (offer.basePlanId) {
-                                PLAN_MONTHLY -> plans += Plan(PLAN_MONTHLY, "Monthly", "$price / month", sub, offer.offerToken)
-                                PLAN_YEARLY -> plans += Plan(PLAN_YEARLY, "Yearly", "$price / year", sub, offer.offerToken)
-                            }
-                        }
-                    life?.oneTimePurchaseOfferDetails?.let {
-                        plans += Plan("lifetime", "Lifetime", "${it.formattedPrice} once", life, null)
-                    }
-                    val order = listOf(PLAN_YEARLY, PLAN_MONTHLY, "lifetime")
-                    main.post { onLoaded(plans.sortedBy { order.indexOf(it.id) }) }
+        if (!isConfigured) {
+            main.post { onLoaded(emptyList()) }
+            return
+        }
+        request("GET", "/api/noscroll/plans", null, token = null) { code, json ->
+            val arr = json?.optJSONArray("plans")
+            val plans = mutableListOf<Plan>()
+            if (code == 200 && arr != null) {
+                for (i in 0 until arr.length()) {
+                    val p = arr.getJSONObject(i)
+                    plans += Plan(p.getString("id"), p.getString("label"), p.getString("price"), null, null)
                 }
             }
+            onLoaded(plans)
         }
     }
 
-    private fun queryDetails(c: BillingClient, id: String, type: String, cb: (ProductDetails?) -> Unit) {
-        val params = QueryProductDetailsParams.newBuilder()
-            .setProductList(
-                listOf(QueryProductDetailsParams.Product.newBuilder().setProductId(id).setProductType(type).build())
-            ).build()
-        c.queryProductDetailsAsync(params) { result, list ->
-            cb(if (result.responseCode == BillingResponseCode.OK) list.firstOrNull() else null)
-        }
-    }
-
+    /** Opens Stripe Checkout (on the website) in the browser. */
     fun buy(activity: Activity, plan: Plan, onDone: () -> Unit = {}) {
-        val details = plan.details as? ProductDetails ?: return
-        onPurchaseDone = onDone
-        connect(activity) { c ->
-            val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(details)
-                .apply { plan.offerToken?.let { setOfferToken(it) } }
-                .build()
-            val flow = BillingFlowParams.newBuilder().setProductDetailsParamsList(listOf(productParams)).build()
-            c.launchBillingFlow(activity, flow)
+        val token = Prefs(activity).authToken
+        request("POST", "/api/noscroll/checkout", JSONObject().put("plan", plan.id), token) { code, json ->
+            openUrlOrError(activity, code, json)
+            onDone()
+        }
+    }
+
+    /** Stripe's customer portal: cancel, change plan, update card. */
+    fun manage(activity: Activity) {
+        val token = Prefs(activity).authToken
+        request("POST", "/api/noscroll/portal", JSONObject(), token) { code, json ->
+            openUrlOrError(activity, code, json)
+        }
+    }
+
+    private fun openUrlOrError(activity: Activity, code: Int, json: JSONObject?) {
+        val url = json?.optString("url").orEmpty()
+        if (code == 200 && url.startsWith("http")) {
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } else {
+            val msg = json?.optString("error")?.takeIf { it.isNotEmpty() } ?: "Couldn't reach the website (error $code)"
+            android.widget.Toast.makeText(activity, msg, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // ---- HTTP -----------------------------------------------------------------------
+
+    /** Small JSON HTTP helper; runs off the main thread, calls back on it. */
+    private fun request(
+        method: String,
+        path: String,
+        body: JSONObject?,
+        token: String?,
+        cb: (Int, JSONObject?) -> Unit,
+    ) {
+        thread {
+            var code = -1
+            var json: JSONObject? = null
+            try {
+                val conn = URL(site + path).openConnection() as HttpURLConnection
+                conn.requestMethod = method
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 15_000
+                conn.setRequestProperty("Accept", "application/json")
+                if (token != null) conn.setRequestProperty("Authorization", "Bearer $token")
+                if (body != null) {
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.outputStream.use { it.write(body.toString().toByteArray()) }
+                }
+                code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val text = stream?.bufferedReader()?.use { it.readText() }
+                json = text?.let { runCatching { JSONObject(it) }.getOrNull() }
+                conn.disconnect()
+            } catch (e: Exception) {
+                // code stays -1 (offline / server unreachable)
+            }
+            main.post { cb(code, json) }
         }
     }
 }
