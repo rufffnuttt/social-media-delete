@@ -1,0 +1,4 @@
+<resources>
+    <!-- Overrides the main app name so the personal build is easy to tell apart. -->
+    <string name="app_name">NoScroll (Personal)</string>
+</resources>

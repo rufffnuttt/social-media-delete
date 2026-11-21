@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NoScroll</string>
+    <string name="service_label">NoScroll – Reels &amp; Shorts blocker</string>
+    <string name="service_description">NoScroll uses this permission to: detect Reels / Shorts / short-video feeds in Instagram, YouTube, TikTok, Facebook and Snapchat and press Back to close them; read the address bar of your web browser to block adult websites; and see which app is open so it can count your social media time and show break reminders. It does not read your messages, collect data, or use the internet — everything stays on your phone.</string>
+</resources>
